@@ -1,0 +1,118 @@
+# Copyright (c) 2026 Federico Pereira <lord.basex@gmail.com>
+#
+# signalhub + coturn, and Caddy (TLS) in production.
+#
+#   Local:      make up          (docker compose --env-file deploy/.env -f deploy/docker-compose.yml up -d --build)
+#   Production: make deploy      (see docker-compose.prod.yml and README.md)
+
+# The project name prefixes containers and volumes (Caddy keeps its
+# certificates in <project>_caddy_data): keep it the same on a server.
+name: ${COMPOSE_PROJECT:-signalhub}
+
+# Every service keeps at most 3 log files of 10 MB: without it Docker's
+# json-file logs grow until the disk is full.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  signalhub:
+    build: ..
+    image: signalhub:dev
+    container_name: ${COMPOSE_PROJECT:-signalhub}-hub
+    restart: unless-stopped
+    logging: *logging
+    ports:
+      - "${SIGNAL_BIND:-127.0.0.1:8090}:8080"
+    environment:
+      ADDR: ":8080"
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
+      ALLOWED_APPS: ${ALLOWED_APPS:-}
+      PAIRING_TTL: ${PAIRING_TTL:-10m}
+      STUN_URLS: ${STUN_URLS:?set STUN_URLS in deploy/.env}
+      TURN_URLS: ${TURN_URLS:-}
+      TURN_SECRET: ${TURN_SECRET:?set TURN_SECRET in deploy/.env}
+      TURN_TTL: ${TURN_TTL:-12h}
+      RATE_LIMIT_PER_MIN: ${RATE_LIMIT_PER_MIN:-5}
+      OWNER_RATE_PER_MIN: ${OWNER_RATE_PER_MIN:-30}
+      MAX_CONNS_PER_IP: ${MAX_CONNS_PER_IP:-20}
+      MAX_CONNS: ${MAX_CONNS:-5000}
+      MSG_RATE_PER_SEC: ${MSG_RATE_PER_SEC:-30}
+      MAX_ROOMS_PER_SESSION: ${MAX_ROOMS_PER_SESSION:-1}
+      CLIENT_IP_HEADER: ${CLIENT_IP_HEADER:-}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+
+  coturn:
+    image: coturn/coturn:4.6.3
+    container_name: ${COMPOSE_PROJECT:-signalhub}-turn
+    restart: unless-stopped
+    logging: *logging
+    ports:
+      - "${TURN_BIND_IP:-127.0.0.1}:${TURN_PORT:-3478}:${TURN_PORT:-3478}/udp"
+      - "${TURN_BIND_IP:-127.0.0.1}:${TURN_PORT:-3478}:${TURN_PORT:-3478}/tcp"
+      - "${TURN_BIND_IP:-127.0.0.1}:${TURN_MIN_PORT:-49300}-${TURN_MAX_PORT:-49320}:${TURN_MIN_PORT:-49300}-${TURN_MAX_PORT:-49320}/udp"
+    # The shared secret goes in a config file inside the container, not on
+    # the command line, where `ps` on the host would show it.
+    environment:
+      TURN_SECRET: ${TURN_SECRET:?set TURN_SECRET in deploy/.env}
+    entrypoint: ["/bin/sh", "-c", "umask 077 && printf 'static-auth-secret=%s\\n' \"$$TURN_SECRET\" > /tmp/secret.conf && exec turnserver -c /tmp/secret.conf \"$$@\"", "turnserver"]
+    # No -n: the config file above (-c) must be read.
+    command:
+      - --log-file=stdout
+      - --listening-port=${TURN_PORT:-3478}
+      - --min-port=${TURN_MIN_PORT:-49300}
+      - --max-port=${TURN_MAX_PORT:-49320}
+      - --use-auth-secret
+      - --realm=${TURN_REALM:-turn.localhost}
+      - --external-ip=${TURN_EXTERNAL_IP:-127.0.0.1}
+      - --fingerprint
+      - --no-cli
+      - --no-multicast-peers
+      # Quotas, so the relay cannot be used as free bandwidth: sessions per
+      # credential and in total, and BYTES per second per session
+      # (500000 B/s is 4 Mbps).
+      - --user-quota=${TURN_USER_QUOTA:-8}
+      - --total-quota=${TURN_TOTAL_QUOTA:-300}
+      - --max-bps=${TURN_MAX_BPS:-500000}
+      # WebRTC relays UDP only.
+      - --no-tcp-relay
+      # Never relay into private networks, loopback or link-local addresses:
+      # a TURN server must not become a door into the server's own network.
+      - --denied-peer-ip=0.0.0.0-0.255.255.255
+      - --denied-peer-ip=10.0.0.0-10.255.255.255
+      - --denied-peer-ip=100.64.0.0-100.127.255.255
+      - --denied-peer-ip=127.0.0.0-127.255.255.255
+      - --denied-peer-ip=169.254.0.0-169.254.255.255
+      - --denied-peer-ip=172.16.0.0-172.31.255.255
+      - --denied-peer-ip=192.0.0.0-192.0.0.255
+      - --denied-peer-ip=192.168.0.0-192.168.255.255
+      - --denied-peer-ip=198.18.0.0-198.19.255.255
+      - --denied-peer-ip=::1
+      - --denied-peer-ip=::ffff:0.0.0.0-::ffff:255.255.255.255
+      - --denied-peer-ip=64:ff9b::-64:ff9b::ffff:ffff
+      - --denied-peer-ip=fc00::-fdff:ffff:ffff:ffff:ffff:ffff:ffff:ffff
+      - --denied-peer-ip=fe80::-febf:ffff:ffff:ffff:ffff:ffff:ffff:ffff
+
+  caddy:
+    image: caddy:2.8
+    container_name: ${COMPOSE_PROJECT:-signalhub}-caddy
+    restart: unless-stopped
+    logging: *logging
+    profiles: ["production"]
+    depends_on: [signalhub]
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      SIGNAL_DOMAIN: ${SIGNAL_DOMAIN:?set SIGNAL_DOMAIN in deploy/.env}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in deploy/.env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

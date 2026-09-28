@@ -1,0 +1,13 @@
+# Copyright (c) 2026 Federico Pereira <lord.basex@gmail.com>
+#
+# Caddy terminates TLS (automatic Let's Encrypt certificate) and forwards
+# WebSocket traffic to signalhub. It appends the client IP to
+# X-Forwarded-For, which signalhub reads when CLIENT_IP_HEADER is set.
+
+{
+	email {$ACME_EMAIL}
+}
+
+{$SIGNAL_DOMAIN} {
+	reverse_proxy signalhub:8080
+}

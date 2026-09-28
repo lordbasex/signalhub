@@ -1,0 +1,25 @@
+# Copyright (c) 2026 Federico Pereira <lord.basex@gmail.com>
+#
+# Production overrides for a server.
+#
+#   make deploy SERVER=root@my-server
+#   (on the server: docker compose --env-file .env -f docker-compose.yml -f docker-compose.prod.yml up -d --build)
+#
+# Caddy is always on here: it gets the Let's Encrypt certificate for
+# SIGNAL_DOMAIN by itself (the domain must already point to this server,
+# with ports 80 and 443 open), keeps it in the caddy_data volume and renews
+# it automatically about 30 days before it expires. Nothing to schedule.
+#
+# coturn uses the host network: publishing a range of relay ports through
+# Docker starts one proxy process per port, too heavy for a small server.
+
+services:
+  signalhub:
+    image: signalhub:prod
+
+  coturn:
+    network_mode: host
+    ports: !reset []
+
+  caddy:
+    profiles: !reset []
