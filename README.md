@@ -292,6 +292,7 @@ signalhub/
 | `MAX_ROOMS_PER_SESSION` | `1` | Rooms open at once per session |
 | `CLIENT_IP_HEADER` | *(empty)* | Header with the real client IP when a proxy sits in front (`X-Forwarded-For` or `X-Real-IP`). Empty = the connection's IP is used. Without it, behind Caddy or a load balancer everyone shares the proxy's IP and the rate limit would be global. |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` |
+| `TZ` | `UTC` | Time zone of the logs (IANA name, e.g. `America/Argentina/Buenos_Aires`). The image embeds the time zone database. |
 
 Example for an app called `go-link`:
 

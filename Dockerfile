@@ -9,8 +9,9 @@ WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
+# timetzdata embeds the time zone database (scratch has none), so TZ works.
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
-    go build -trimpath -ldflags "-s -w" -o /out/signal ./cmd/signal
+    go build -trimpath -tags timetzdata -ldflags "-s -w" -o /out/signal ./cmd/signal
 # An unprivileged user for the final image, which has no shell to create it.
 RUN echo "nonroot:x:65532:65532:nonroot:/:/sbin/nologin" > /out/passwd && \
     echo "nonroot:x:65532:" > /out/group
