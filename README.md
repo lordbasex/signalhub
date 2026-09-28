@@ -26,7 +26,7 @@ It is **generic**: it knows nothing about video, games or any particular applica
 
 - **Signaling:** before WebRTC peers can connect, they must exchange an *offer* and an *answer* (SDP) plus their possible addresses (ICE candidates). That is the "handshake". This server carries those messages; afterwards the traffic flows directly between the peers.
 - **Device Authorization Grant (RFC 8628):** the standard Smart TVs use. The device shows a code and the user types it on a website from another device.
-- **Namespace (`app`):** each project identifies itself with an `app` (`"go-link"`, `"dialer"`). A code from one app cannot be used from another.
+- **Namespace (`app`):** each project identifies itself with an `app` (`"go-link"`, `"other"`). A code from one app cannot be used from another.
 
 ---
 
