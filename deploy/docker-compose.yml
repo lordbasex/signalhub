@@ -45,7 +45,7 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-info}
 
   coturn:
-    image: coturn/coturn:4.6.3
+    image: coturn/coturn:4.18.0
     container_name: ${COMPOSE_PROJECT:-signalhub}-turn
     restart: unless-stopped
     logging: *logging
@@ -61,6 +61,7 @@ services:
     # No -n: the config file above (-c) must be read.
     command:
       - --log-file=stdout
+      - --pidfile=/tmp/turnserver.pid
       - --listening-port=${TURN_PORT:-3478}
       - --min-port=${TURN_MIN_PORT:-49300}
       - --max-port=${TURN_MAX_PORT:-49320}
@@ -68,7 +69,9 @@ services:
       - --realm=${TURN_REALM:-turn.localhost}
       - --external-ip=${TURN_EXTERNAL_IP:-127.0.0.1}
       - --fingerprint
-      - --no-cli
+      # No TLS listener: TURN over TLS (5349) is not used, and Caddy
+      # terminates TLS for signaling. (The admin CLI is off by default.)
+      - --no-tls
       - --no-multicast-peers
       # Quotas, so the relay cannot be used as free bandwidth: sessions per
       # credential and in total, and BYTES per second per session
