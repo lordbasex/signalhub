@@ -407,6 +407,8 @@ signalhub itself (`127.0.0.1:8090`) is never opened to the internet: Caddy is it
 
 **Updating:** commit and run `make deploy` again. The server keeps its `deploy/.env` (and its secret).
 
+**Or run it from a clone on the server** (`git clone https://github.com/lordbasex/signalhub.git /opt/signalhub`), with the server-side targets: `make prod-up` (the first time it creates `deploy/.env` with a random `TURN_SECRET` and stops so you set your values), then `make update` (`git pull` and restart with the new code), `make prod-ps`, `make prod-logs`, `make prod-down`. On a server, use the `prod-*` targets: `make up` is for your computer (no Caddy, coturn on `127.0.0.1`).
+
 **Locally:** `make up` does the same on your computer (signalhub + coturn, no Caddy), creating `deploy/.env` with a random `TURN_SECRET` the first time; clients connect to `ws://127.0.0.1:8090/ws?v=1`. `make help` lists every shortcut, and [deploy/README.md](deploy/README.md) has the details (coturn hardening, moving a server).
 
 Health check: `GET /healthz` → `ok`.

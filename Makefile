@@ -19,7 +19,7 @@ REMOTE_COMPOSE := docker compose --env-file .env -f docker-compose.yml -f docker
 IMAGE      ?= signalhub
 VERSION    ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 
-.PHONY: help test fmt vet vuln build docker up down restart logs ps health deploy deploy-ps deploy-logs deploy-health check-server
+.PHONY: help test fmt vet vuln build docker up down restart logs ps health prod-up prod-down prod-ps prod-logs update deploy deploy-ps deploy-logs deploy-health check-server
 
 help: ## this list
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -44,12 +44,12 @@ build: ## the binary in bin/signal (static, no cgo)
 docker: ## the Docker image signalhub:<version> for this machine
 	docker build -t $(IMAGE):$(VERSION) -t $(IMAGE):latest .
 
-# --- local stack --------------------------------------------------------------
+# --- local stack (on your computer) ------------------------------------------
 
 $(ENV_FILE):
 	@sh deploy/setup-env.sh local
 
-up: $(ENV_FILE) ## start signalhub + coturn locally (rebuilds signalhub)
+up: $(ENV_FILE) ## on your computer: start signalhub + coturn (rebuilds signalhub)
 	$(COMPOSE) up -d --build
 
 down: $(ENV_FILE) ## stop the local stack
@@ -66,7 +66,29 @@ ps: $(ENV_FILE) ## local containers
 health: ## local health check
 	@curl -fsS http://$$(grep -E '^SIGNAL_BIND=' $(ENV_FILE) | cut -d= -f2 || echo 127.0.0.1:8090)/healthz && echo
 
-# --- server -------------------------------------------------------------------
+# --- on the server (in its clone of this repository, e.g. /opt/signalhub) ---
+
+PROD_COMPOSE := $(COMPOSE) -f deploy/docker-compose.prod.yml
+
+prod-up: ## on the server: build and start signalhub, coturn and Caddy (production)
+	@sh deploy/setup-env.sh production
+	$(PROD_COMPOSE) up -d --build
+	$(PROD_COMPOSE) ps
+
+prod-down: ## on the server: stop the production stack (volumes and certificates stay)
+	$(PROD_COMPOSE) down
+
+prod-ps: ## on the server: production containers
+	$(PROD_COMPOSE) ps
+
+prod-logs: ## on the server: follow the production logs
+	$(PROD_COMPOSE) logs -f --tail=100
+
+update: ## on the server: git pull and restart with the new code
+	git pull --ff-only
+	$(MAKE) prod-up
+
+# --- from your computer to a server over SSH ----------------------------------
 
 check-server:
 	@test -n "$(SERVER)" || (echo "Set SERVER, e.g. make deploy SERVER=root@my-server" && exit 1)

@@ -49,6 +49,19 @@ cd /opt/signalhub/deploy
 docker compose --env-file .env -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 ```
 
+**Or from a clone on the server:**
+
+```bash
+git clone https://github.com/lordbasex/signalhub.git /opt/signalhub
+cd /opt/signalhub
+make prod-up      # first time: creates deploy/.env with a random TURN_SECRET and stops; set your values
+make prod-up      # builds the image and starts signalhub, coturn and Caddy
+make update       # later: git pull and restart with the new code
+make prod-ps      # containers; make prod-logs, make prod-down
+```
+
+On a server always use the `prod-*` targets: `make up` is the local stack (no Caddy, coturn on `127.0.0.1`).
+
 **TLS:** in production Caddy always runs (`docker-compose.prod.yml`). It gets the Let's Encrypt certificate for `SIGNAL_DOMAIN` by itself, keeps it in the `caddy_data` volume (it survives restarts and updates) and **renews it automatically** about 30 days before it expires. Nothing to schedule. The domain must point to the server and ports 80 and 443 must be open.
 
 **coturn on the host network:** publishing a range of relay ports through Docker starts one proxy process per port, too much for a small server, so production uses `network_mode: host`.
