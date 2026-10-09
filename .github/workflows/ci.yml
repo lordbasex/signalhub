@@ -39,4 +39,5 @@ jobs:
         with:
           fetch-depth: 0
       - name: gitleaks (the whole history)
-        run: docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:latest git /repo --no-banner --redact
+        # from GitHub's registry: Docker Hub refuses unauthenticated pulls past its rate limit
+        run: docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:latest git /repo --no-banner --redact
